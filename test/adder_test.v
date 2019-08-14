@@ -22,4 +22,8 @@ module test;
     $finish();
   end
 
+  initial begin
+    $dumpfile("test.vcd");
+    $dumpvars(0);
+  end
 endmodule
