@@ -1,0 +1,14 @@
+read -sv src/fifo.v
+hierarchy -top fifoRO
+proc
+fsm
+opt
+memory
+opt
+techmap
+opt
+
+dfflibmap -liberty NangateOpenCellLibrary_slow_ecsm.lib
+abc -liberty NangateOpenCellLibrary_slow_ecsm.lib
+
+write_verilog fifoRO_syn.v
