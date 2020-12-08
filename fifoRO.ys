@@ -1,5 +1,5 @@
 read -sv src/fifo.v
-hierarchy -top fifoRO
+hierarchy -top fifoRO_norm
 proc
 fsm
 opt
