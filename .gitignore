@@ -1,3 +1,9 @@
 *.out
 *.vcd
 *_test
+*.log
+*.jou
+*.hw
+*.cache
+*.runs
+*.ip_user_files
