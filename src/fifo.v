@@ -79,7 +79,7 @@ module fifoRO #(parameter dw=8, L=7)
   integer i;
   always @(posedge clk or negedge rstn)
     if(~rstn) begin
-      wp <= 0; valid <= 0;
+      wp = 0; valid = 0;
     end else begin
       if(req_in & ack_in) begin
         data[wp] = d_in;
