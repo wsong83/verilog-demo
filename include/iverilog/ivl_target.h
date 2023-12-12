@@ -1,7 +1,7 @@
 #ifndef IVL_ivl_target_H
 #define IVL_ivl_target_H
 /*
- * Copyright (c) 2000-2015 Stephen Williams (steve@icarus.com)
+ * Copyright (c) 2000-2021 Stephen Williams (steve@icarus.com)
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -21,6 +21,7 @@
 
 # include  <inttypes.h>
 # include  <stddef.h>
+# include  <stdbool.h>
 
 /* Re the _CLASS define: clang++ wants this to be class to match the
  * definition, but clang (the C) compiler needs it to be a struct
@@ -265,6 +266,8 @@ typedef enum ivl_logic_e {
       IVL_LO_BUFT   = 24, /* transparent bufz. (NOT "tri-state") */
       IVL_LO_BUFZ   =  5,
       IVL_LO_CMOS   = 22,
+      IVL_LO_EQUIV  = 25,
+      IVL_LO_IMPL   = 26,
       IVL_LO_NAND   =  6,
       IVL_LO_NMOS   =  7,
       IVL_LO_NOR    =  8,
@@ -280,7 +283,6 @@ typedef enum ivl_logic_e {
       IVL_LO_RPMOS  = 16,
       IVL_LO_XNOR   = 18,
       IVL_LO_XOR    = 19,
-
       IVL_LO_UDP    = 21
 } ivl_logic_t;
 
@@ -306,8 +308,10 @@ typedef enum ivl_lpm_type_e {
       IVL_LPM_CONCAT = 16,
       IVL_LPM_CONCATZ = 36, /* Transparent concat */
       IVL_LPM_CMP_EEQ= 18, /* Case EQ (===) */
-      IVL_LPM_CMP_EQX= 37, /* Wildcard EQ (==?) */
+      IVL_LPM_CMP_EQX= 37, /* Wildcard EQ (casex) */
       IVL_LPM_CMP_EQZ= 38, /* casez EQ */
+      IVL_LPM_CMP_WEQ= 41,
+      IVL_LPM_CMP_WNE= 42,
       IVL_LPM_CMP_EQ = 10,
       IVL_LPM_CMP_GE =  1,
       IVL_LPM_CMP_GT =  2,
@@ -315,6 +319,7 @@ typedef enum ivl_lpm_type_e {
       IVL_LPM_CMP_NEE= 19, /* Case NE (!==) */
       IVL_LPM_DIVIDE = 12,
       IVL_LPM_FF     =  3,
+      IVL_LPM_LATCH  = 40,
       IVL_LPM_MOD    = 13,
       IVL_LPM_MULT   =  4,
       IVL_LPM_MUX    =  5,
@@ -352,9 +357,12 @@ typedef enum ivl_path_edge_e {
 /* Processes are initial, always, or final blocks with a statement. This is
    the type of the ivl_process_t object. */
 typedef enum ivl_process_type_e ENUM_UNSIGNED_INT {
-      IVL_PR_INITIAL = 0,
-      IVL_PR_ALWAYS  = 1,
-      IVL_PR_FINAL   = 2
+      IVL_PR_INITIAL      = 0,
+      IVL_PR_ALWAYS       = 1,
+      IVL_PR_ALWAYS_COMB  = 3,
+      IVL_PR_ALWAYS_FF    = 4,
+      IVL_PR_ALWAYS_LATCH = 5,
+      IVL_PR_FINAL        = 2
 } ivl_process_type_t;
 
 /* These are the sorts of reasons a scope may come to be. These types
@@ -419,6 +427,7 @@ typedef enum ivl_statement_type_e {
       IVL_ST_FORK_JOIN_ANY  = 28,
       IVL_ST_FORK_JOIN_NONE = 29,
       IVL_ST_FREE    = 26,
+      IVL_ST_NB_TRIGGER = 31,
       IVL_ST_RELEASE = 17,
       IVL_ST_REPEAT  = 18,
       IVL_ST_STASK   = 19,
@@ -427,6 +436,14 @@ typedef enum ivl_statement_type_e {
       IVL_ST_WAIT    = 22,
       IVL_ST_WHILE   = 23
 } ivl_statement_type_t;
+
+/* Case statements can be tagged as unique/unique0/priority. */
+typedef enum ivl_case_quality_t {
+      IVL_CASE_QUALITY_BASIC    = 0,  /* no quality flags */
+      IVL_CASE_QUALITY_UNIQUE   = 1,
+      IVL_CASE_QUALITY_UNIQUE0  = 2,
+      IVL_CASE_QUALITY_PRIORITY = 3
+} ivl_case_quality_t;
 
 /* SystemVerilog allows a system function to be called as a task. */
 typedef enum ivl_sfunc_as_task_e {
@@ -510,6 +527,10 @@ extern ivl_island_t ivl_branch_island(ivl_branch_t obj);
  * ivl_path_is_condit
  *    Is this a conditional structure? Needed for ifnone.
  *
+ * ivl_path_is_parallel
+ *    This returns true if the path is a parallel connection and
+ *    false if the path is a full connection.
+ *
  * ivl_path_source_posedge
  * ivl_path_source_negedge
  *    These functions return true if the source is edge sensitive.
@@ -519,6 +540,8 @@ extern ivl_nexus_t ivl_path_source(ivl_delaypath_t obj);
 extern uint64_t ivl_path_delay(ivl_delaypath_t obj, ivl_path_edge_t pt);
 extern ivl_nexus_t ivl_path_condit(ivl_delaypath_t obj);
 extern int ivl_path_is_condit(ivl_delaypath_t obj);
+
+extern int ivl_path_is_parallel(ivl_delaypath_t obj);
 
 extern int ivl_path_source_posedge(ivl_delaypath_t obj);
 extern int ivl_path_source_negedge(ivl_delaypath_t obj);
@@ -746,6 +769,9 @@ extern ivl_scope_t ivl_event_scope(ivl_event_t net);
 
 extern unsigned    ivl_event_nany(ivl_event_t net);
 extern ivl_nexus_t ivl_event_any(ivl_event_t net, unsigned idx);
+
+extern unsigned    ivl_event_nedg(ivl_event_t net);
+extern ivl_nexus_t ivl_event_edg(ivl_event_t net, unsigned idx);
 
 extern unsigned    ivl_event_nneg(ivl_event_t net);
 extern ivl_nexus_t ivl_event_neg(ivl_event_t net, unsigned idx);
@@ -1245,8 +1271,10 @@ extern unsigned    ivl_lpm_lineno(ivl_lpm_t net);
  * width of a general power is the XXXX of the widths of the
  * inputs.
  *
- * Power may be signed. If so, the output should be sign extended
- * to fill in its result.
+ * Power may be signed. This indicates the type of the exponent. The
+ * base will always be treated as unsigned. The compiler must ensure
+ * the width of the base is equal to the width of the output to
+ * obtain the correct result when the base is really a signed value.
  *
  * - Part Select (IVL_LPM_PART_VP and IVL_LPM_PART_PV)
  * There are two part select devices, one that extracts a part from a
@@ -1309,8 +1337,13 @@ extern unsigned    ivl_lpm_lineno(ivl_lpm_t net);
  * inputs and the Q. All the types must be exactly the same.
  *
  * - D-FlipFlop (IVL_LPM_FF)
- * This data is an edge sensitive register. The ivl_lpm_q output and
- * single ivl_lpm_data input are the same with, ivl_lpm_width. This
+ * This device is an edge sensitive register. The ivl_lpm_q output and
+ * single ivl_lpm_data input are the same width, ivl_lpm_width. This
+ * device carries a vector like other LPM devices.
+ *
+ * - Latch (IVL_LPM_LATCH)
+ * This device is an asynchronous latch. The ivl_lpm_q output and
+ * single ivl_lpm_data input are the same width, ivl_lpm_width. This
  * device carries a vector like other LPM devices.
  *
  * - Memory port (IVL_LPM_RAM) (deprecated in favor of IVL_LPM_ARRAY)
@@ -1428,18 +1461,18 @@ extern unsigned    ivl_lpm_negedge(ivl_lpm_t net);
 extern ivl_nexus_t ivl_lpm_clk(ivl_lpm_t net);
   /* IVL_LPM_UFUNC */
 extern ivl_scope_t  ivl_lpm_define(ivl_lpm_t net);
-  /* IVL_LPM_FF */
+  /* IVL_LPM_FF IVL_LPM_LATCH*/
 extern ivl_nexus_t ivl_lpm_enable(ivl_lpm_t net);
   /* IVL_LPM_ADD IVL_LPM_CONCAT IVL_LPM_FF IVL_LPM_PART IVL_LPM_MULT
      IVL_LPM_MUX IVL_LPM_POW IVL_LPM_SHIFTL IVL_LPM_SHIFTR IVL_LPM_SUB
-     IVL_LPM_UFUNC IVL_LPM_SUBSTITUTE */
+     IVL_LPM_UFUNC IVL_LPM_SUBSTITUTE IVL_LPM_LATCH */
 extern ivl_nexus_t ivl_lpm_data(ivl_lpm_t net, unsigned idx);
   /* IVL_LPM_ADD IVL_LPM_MULT IVL_LPM_POW IVL_LPM_SUB IVL_LPM_CMP_EQ
      IVL_LPM_CMP_EEQ IVL_LPM_CMP_EQX IVL_LPM_CMP_EQZ IVL_LPM_CMP_NEE */
 extern ivl_nexus_t ivl_lpm_datab(ivl_lpm_t net, unsigned idx);
   /* IVL_LPM_ADD IVL_LPM_FF IVL_LPM_MULT IVL_LPM_PART IVL_LPM_POW
      IVL_LPM_SUB IVL_LPM_UFUNC IVL_LPM_CMP_EEQ IVL_LPM_CMP_EQX
-     IVL_LPM_CMP_EQZ IVL_LPM_CMP_NEE IVL_LPM_SUBSTITUTE */
+     IVL_LPM_CMP_EQZ IVL_LPM_CMP_NEE IVL_LPM_SUBSTITUTE IVL_LPM_LATCH */
 extern ivl_nexus_t ivl_lpm_q(ivl_lpm_t net);
 extern ivl_drive_t ivl_lpm_drive0(ivl_lpm_t net);
 extern ivl_drive_t ivl_lpm_drive1(ivl_lpm_t net);
@@ -1745,6 +1778,13 @@ extern unsigned    ivl_parameter_lineno(ivl_parameter_t net);
  * ivl_scope_lineno
  *    Returns the instantiation file and line for this scope.
  *
+ * ivl_scope_func_type
+ * ivl_scope_func_signed
+ * ivl_scope_func_width
+ *
+ *    If the scope is a function, these function can be used to get
+ *    the type of the return value.
+ *
  * ivl_scope_is_auto
  *    Is the task or function declared to be automatic?
  *
@@ -1863,6 +1903,9 @@ extern const char*  ivl_scope_tname(ivl_scope_t net);
 extern int          ivl_scope_time_precision(ivl_scope_t net);
 extern int          ivl_scope_time_units(ivl_scope_t net);
 
+extern ivl_variable_type_t ivl_scope_func_type(ivl_scope_t net);
+extern int ivl_scope_func_signed(ivl_scope_t net);
+extern unsigned ivl_scope_func_width(ivl_scope_t net);
 
 /* SIGNALS
  * Signals are named things in the Verilog source, like wires and
@@ -2084,6 +2127,7 @@ extern unsigned ivl_stmt_lineno(ivl_statement_t net);
  *    handle disable statements.
  *
  * ivl_stmt_events
+ * ivl_stmt_needs_t0_trigger
  * ivl_stmt_nevent
  *    Statements that have event arguments (TRIGGER and WAIT) make
  *    those event objects available through these methods.
@@ -2198,6 +2242,8 @@ extern ivl_scope_t ivl_stmt_call(ivl_statement_t net);
 extern unsigned ivl_stmt_case_count(ivl_statement_t net);
   /* IVL_ST_CASE,IVL_ST_CASER,IVL_ST_CASEX,IVL_ST_CASEZ */
 extern ivl_expr_t ivl_stmt_case_expr(ivl_statement_t net, unsigned i);
+  /* IVL+ST_CASE,IVL_ST_CASER,IVL_ST_CASEX,IVL_ST_CASEZ */
+extern ivl_case_quality_t ivl_stmt_case_quality(ivl_statement_t net);
   /* IVL_ST_CASE,IVL_ST_CASER,IVL_ST_CASEX,IVL_ST_CASEZ */
 extern ivl_statement_t ivl_stmt_case_stmt(ivl_statement_t net, unsigned i);
   /* IVL_ST_CONDIT IVL_ST_CASE IVL_ST_REPEAT IVL_ST_WHILE */
@@ -2211,8 +2257,11 @@ extern ivl_expr_t ivl_stmt_delay_expr(ivl_statement_t net);
   /* IVL_ST_DELAY */
 extern uint64_t ivl_stmt_delay_val(ivl_statement_t net);
   /* IVL_ST_WAIT IVL_ST_TRIGGER */
+extern unsigned    ivl_stmt_needs_t0_trigger(ivl_statement_t net);
 extern unsigned    ivl_stmt_nevent(ivl_statement_t net);
 extern ivl_event_t ivl_stmt_events(ivl_statement_t net, unsigned idx);
+  /* IVL_ST_DISABLE */
+extern bool ivl_stmt_flow_control(ivl_statement_t net);
   /* IVL_ST_CONTRIB */
 extern ivl_expr_t ivl_stmt_lexp(ivl_statement_t net);
   /* IVL_ST_ASSIGN IVL_ST_ASSIGN_NB IVL_ST_CASSIGN IVL_ST_DEASSIGN
@@ -2319,7 +2368,7 @@ extern const char* ivl_type_prop_name(ivl_type_t net, int idx);
 extern ivl_type_t  ivl_type_prop_type(ivl_type_t net, int idx);
 
 
-#if defined(__MINGW32__) || defined (__CYGWIN32__)
+#if defined(__MINGW32__) || defined (__CYGWIN__)
 #  define DLLEXPORT __declspec(dllexport)
 #else
 #  define DLLEXPORT

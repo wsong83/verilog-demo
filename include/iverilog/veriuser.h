@@ -1,7 +1,7 @@
 #ifndef VERIUSER_H
 #define VERIUSER_H
 /*
- * Copyright (c) 2002-2014 Stephen Williams (steve@icarus.com)
+ * Copyright (c) 2002-2019 Stephen Williams (steve@icarus.com)
  *
  *    This source code is free software; you can redistribute it
  *    and/or modify it in source code form under the terms of the GNU
@@ -152,6 +152,9 @@ typedef struct t_tfcell
  */
 extern s_tfcell veriusertfs[];
 extern void veriusertfs_register_table(p_tfcell vtable);
+#if defined(__MINGW32__) || defined (__CYGWIN__)
+extern __declspec(dllexport) void (*vlog_startup_routines[])(void);
+#endif
 
 #define usertask 1
 #define userfunction 2
@@ -159,6 +162,7 @@ extern void veriusertfs_register_table(p_tfcell vtable);
 
 /* callback reasons */
 #define reason_checktf 1
+#define reason_sizetf  2
 #define reason_calltf  3
 #define reason_paramvc 7
 #define reason_synch   8
